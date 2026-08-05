@@ -12,6 +12,7 @@ Revision history for Perl extension Sereal-Decoder
       next decode on the same decoder then thawed items belonging to the failed
       document and looked up ref_thawhash keys pointing at freed AVs. That
       segfaulted or silently produced the wrong class.
+      See https://github.com/Sereal/Sereal/pull/316
 
 5.009
     * Only use Perl's C<$Config{ccflags}> when building bundled zstd on
