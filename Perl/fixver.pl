@@ -12,6 +12,12 @@ my @files= qw(
     Sereal/Makefile.PL
 );
 
+my @changes_files= qw(
+    Decoder/Changes
+    Encoder/Changes
+    Sereal/Changes
+);
+
 my $to= shift @ARGV;
 
 die "usage: MAJOR.MINOR_(DEV) REASON" if !$to;
@@ -23,6 +29,29 @@ my ($major,$minor,$dev)= split/[_.]/, $to;
 $to= $dev ? sprintf "%d.%03d_%03d", $major, $minor, $dev
           : sprintf "%d.%03d",      $major, $minor
 ;
+
+foreach my $file (@changes_files) {
+    open my $in, "<", $file
+        or die "Failed to open for read '$file': $!";
+    local $/;
+    my $changes= <$in>;
+    close $in;
+
+    next if $changes =~ /^\Q$to\E\s*$/m;
+
+    my $entry= "$to\n    * $reason\n\n";
+    if ($changes =~ /^\d+\.\d{3}(?:_\d{3})?\s*$/m) {
+        substr $changes, $-[0], 0, $entry;
+    } else {
+        $changes .= "\n" unless $changes =~ /\n\z/;
+        $changes .= $entry;
+    }
+
+    open my $out, ">", $file
+        or die "Failed to open for write '$file': $!";
+    print $out $changes;
+    close $out;
+}
 
 my %special= (
     'Sereal/lib/Sereal.pm' => $to
