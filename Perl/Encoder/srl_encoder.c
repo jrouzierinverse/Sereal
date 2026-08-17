@@ -1170,7 +1170,10 @@ srl_prepare_encoder(pTHX_ srl_encoder_t *enc)
     /* Set to being in use */;
     SRL_ENC_SET_OPER_FLAG(enc, SRL_OF_ENCODER_DIRTY);
 
-    /* Register our structure for destruction on scope exit */
+    /* Register our structure for cleanup when the current scope is left. The
+     * entry holds a raw pointer with no reference to the Perl object that may
+     * own the struct, so callers must ensure the scope it lands on ends before
+     * that object can be released -- see the ENTER/LEAVE in Encoder.xs. */
     SAVEDESTRUCTOR_X(&srl_destructor_hook, (void *)enc);
 
     return enc;

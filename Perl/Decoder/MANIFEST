@@ -5,6 +5,7 @@ author_tools/freeze_thaw_timing.pl
 author_tools/hobodecoder.pl
 author_tools/numeric_str_length.c
 author_tools/stringify_test.c
+author_tools/uaf_temporary_handle.pl
 author_tools/update_decoder_flag_consts.pl
 author_tools/update_from_header.pl
 author_tools/valgrind.supp
@@ -139,6 +140,7 @@ t/902_bad_input.t
 t/903_reentrancy.t
 t/903_regr_oob_copy_shortbinary.t
 t/904_regr_thaw_state_reuse.t
+t/905_regr_savestack_scope.t
 t/data/corpus
 t/lib/Sereal/BulkTest.pm
 t/lib/Sereal/TestSet.pm

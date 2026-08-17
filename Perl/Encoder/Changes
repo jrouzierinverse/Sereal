@@ -5,6 +5,29 @@ Revision history for Perl extension Sereal-Encoder
 *          of the decoder before upgrading to version 5 of the *
 *          encoder!                                            *
 ****************************************************************
+5.011
+    * Fixed a use-after-free in C<sereal_encode_with_object> (and in
+      C<Sereal::Encoder::encode> called as a plain function).
+      srl_prepare_encoder() registers a savestack destructor holding a raw pointer
+      to the encoder struct; without a scope of its own that entry landed on the
+      caller's scope, which perl unwinds only at the end of the enclosing block,
+      while FREETMPS runs at the end of each statement. An encoder released first
+      was therefore freed by DESTROY, and the destructor then cleared an
+      already-freed encoder, decrementing refcounts through freed pointer tables.
+      Reachable with a temporary, e.g.
+      C<sereal_encode_with_object(Sereal::Encoder-E<gt>new, $data)>, and also by
+      undef-ing, reassigning or deleting the variable holding the encoder. The OO
+      C<-E<gt>encode()> form was never affected.
+
+    * C<sereal_encode_with_object> no longer leaves the encoder marked in-use.
+      Previously every call after the first in the same scope silently ran on a
+      clone, which does not inherit compress_level -- so those documents were
+      emitted uncompressed. Dropping the spurious clone also makes repeated
+      encodes in one scope substantially faster.
+
+    * Added an undocumented C<operational_flags> accessor alongside C<flags>, so
+      the per-run SRL_OF_* state can be asserted from tests.
+
 5.010
     * Released to match Decoder version.
 

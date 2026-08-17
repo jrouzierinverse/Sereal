@@ -63,7 +63,17 @@ THX_pp1_sereal_encode_with_object(pTHX_ U8 has_hdr)
    * means we already have to do a malloc and we might as well use the
    * opportunity to allocate only as much memory as we really need to hold
    * the output. */
+
+  /* The encode needs its own scope, for the reason spelled out in
+   * Decoder.xs's THX_pp1_sereal_decode(): srl_prepare_encoder()'s savestack
+   * destructor holds a raw srl_encoder_t *, and it used to outlive an encoder
+   * that was released at the end of the statement rather than the scope.
+   *
+   * No SAVETMPS/FREETMPS: ret_sv is mortal. LEAVE precedes the SPAGAIN so the
+   * stack pointer is resynced afterwards. */
+  ENTER;
   ret_sv= srl_dump_data_structure_mortal_sv(aTHX_ enc, body_sv, header_sv, SRL_ENC_SV_COPY_ALWAYS);
+  LEAVE;
   SPAGAIN;
   TOPs = ret_sv;
 }
@@ -237,6 +247,16 @@ flags(enc)
     srl_encoder_t *enc;
   CODE:
     RETVAL = enc->flags;
+  OUTPUT: RETVAL
+
+# The per-run SRL_OF_* flags, as opposed to the persistent options in flags().
+# Undocumented, like flags(); tests use it to assert the encoder is not left
+# marked in-use once an encode has returned.
+U32
+operational_flags(enc)
+    srl_encoder_t *enc;
+  CODE:
+    RETVAL = enc->operational_flags;
   OUTPUT: RETVAL
 
 void

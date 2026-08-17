@@ -104,6 +104,18 @@ THX_pp1_sereal_decode(pTHX_ U8 opopt)
     }
 
     decoder = (srl_decoder_t *)SvIV(decoder_sv);
+
+    /* The decode needs its own scope. srl_begin_decoding() registers a
+     * savestack destructor holding a raw srl_decoder_t *, and perl unwinds the
+     * savestack at the end of the enclosing *scope* but runs FREETMPS at the end
+     * of the enclosing *statement* -- statement first. So without this, a
+     * decoder released before the scope ended, as in
+     * sereal_decode_with_object(Sereal::Decoder->new, $doc), was freed by
+     * DESTROY and the destructor then ran on freed memory.
+     *
+     * No SAVETMPS/FREETMPS: body_into, header_into and srl_begin_decoding()'s
+     * copy of a utf8 source are mortal and must survive. */
+    ENTER;
     if (expect_true(opopt & OPOPT_DO_BODY)) {
         if (opopt & OPOPT_DO_HEADER) {
              srl_decode_all_into(aTHX_ decoder, src_sv, header_into,
@@ -114,6 +126,7 @@ THX_pp1_sereal_decode(pTHX_ U8 opopt)
     } else {
         srl_decode_header_into(aTHX_ decoder, src_sv, header_into, offset);
     }
+    LEAVE;
 
     if (expect_true(need_retvalue)) {
         SV *retvalue;

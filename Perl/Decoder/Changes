@@ -5,6 +5,26 @@ Revision history for Perl extension Sereal-Decoder
 *          of the decoder before upgrading to version 5 of the *
 *          encoder!                                            *
 ****************************************************************
+5.011
+    * Fixed a use-after-free in the functional decode interfaces
+      (C<sereal_decode_with_object> and friends, and the
+      C<Sereal::Decoder::decode*> aliases called as plain functions).
+      srl_begin_decoding() registers a savestack destructor holding a raw pointer
+      to the decoder struct; without a scope of its own that entry landed on the
+      caller's scope, which perl unwinds only at the end of the enclosing block,
+      while FREETMPS runs at the end of each statement. A decoder released first
+      was therefore freed by DESTROY, and the destructor then ran on freed memory
+      and corrupted the heap. Reachable with a temporary, e.g.
+      C<sereal_decode_with_object(Sereal::Decoder-E<gt>new, $doc)>, and also by
+      undef-ing, reassigning or deleting the variable holding the decoder. The OO
+      C<-E<gt>decode()> forms were never affected.
+
+    * The functional interfaces no longer leave the decoder marked in-use. A
+      C<sereal_decode_only_header*> call used to leave it dirty, so the next
+      decode in the same scope silently ran on a clone -- which does not inherit
+      flags_readonly or alias_varint_under, so C<set_readonly>,
+      C<set_readonly_scalars> and integer aliasing were dropped from that decode.
+
 5.010
     * Reset the pending frozen-object state (thaw_av and ref_thawhash) at the
       start of every decode. A decode that died before srl_finalize_structure

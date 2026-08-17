@@ -597,7 +597,12 @@ srl_decode_all_into(pTHX_ srl_decoder_t *dec, SV *src, SV *header_into, SV *body
 SRL_STATIC_INLINE void
 srl_clear_decoder(pTHX_ srl_decoder_t *dec)
 {
-    if (dec->buf.start == dec->buf.end)
+    /* Nothing to clean up unless a decode has begun. Keyed on DIRTY rather than
+     * on buf.start == buf.end: every site that clears DIRTY also clears the
+     * buffer, so this still returns early wherever the buffer test did, and it
+     * no longer skips the cleanup for an empty input, where the buffer is
+     * legitimately empty while a decode is in progress. */
+    if (!SRL_DEC_HAVE_OPTION(dec, SRL_F_DECODER_DIRTY))
         return;
 
     srl_clear_decoder_body_state(aTHX_ dec);
@@ -671,14 +676,17 @@ srl_begin_decoding(pTHX_ srl_decoder_t *dec, SV *src, UV start_offset)
     SRL_DEC_SET_OPTION(dec, SRL_F_DECODER_DIRTY);
 
     /* Start from a clean slate regardless of how the previous decode on this
-     * decoder ended. srl_clear_decoder() returns early when buf.start ==
-     * buf.end, so cleanup on the way out is not guaranteed to have run -- and
-     * after a croak there may have been no cleanup at all. Leftover frozen-object
-     * state is not merely stale, it is a use-after-free waiting to happen
-     * (see srl_clear_thaw_state). */
+     * decoder ended. Leftover frozen-object state is not merely stale, it is a
+     * use-after-free waiting to happen (see srl_clear_thaw_state). Kept as a
+     * belt-and-braces reset: srl_clear_decoder() used to be able to skip the
+     * cleanup on the way out, and while its guard no longer does that, every
+     * decode goes through here and this is the cheaper place to be sure. */
     srl_clear_thaw_state(aTHX_ dec);
 
-    /* Register our structure for destruction on scope exit */
+    /* Register our structure for cleanup when the current scope is left. The
+     * entry holds a raw pointer with no reference to the Perl object that may
+     * own the struct, so callers must ensure the scope it lands on ends before
+     * that object can be released -- see the ENTER/LEAVE in Decoder.xs. */
     SAVEDESTRUCTOR_X(&srl_decoder_destructor_hook, (void *)dec);
 
     if (SvUTF8(src)) {
